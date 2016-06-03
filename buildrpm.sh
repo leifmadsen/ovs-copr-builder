@@ -60,6 +60,8 @@ sed -i 's/AC_INIT.*/AC_INIT(openvswitch, '$VERSION', bugs@openvswitch.org)/' con
     ./boot.sh
     ./configure
     make dist
+    # skip checks
+    sed -i '/%bcond_with dpdk/a %bcond_with check' rhel/openvswitch-fedora.spec
     cd -
 } &> /dev/null
 
@@ -81,7 +83,6 @@ if [ ! -z $SRPM ]; then
     echo "      |__ Uploading $SRPM"
     {
     copr build --nowait \
-               --chroot epel-7-x86_64 \
                 ovs-master $SRPM
     } &> /dev/null
 else
