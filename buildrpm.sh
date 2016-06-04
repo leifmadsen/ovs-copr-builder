@@ -61,7 +61,8 @@ sed -i 's/AC_INIT.*/AC_INIT(openvswitch, '$VERSION', bugs@openvswitch.org)/' con
     ./configure
     make dist
     # skip checks
-    sed -i '/%bcond_with dpdk/a %bcond_with check' rhel/openvswitch-fedora.spec
+    sed -i '/%bcond_with dpdk/a %bcond_without check' rhel/openvswitch-fedora.spec
+    sed -i 's/%bcond_without check//' rhel/openvswitch-fedora.spec
     cd -
 } &> /dev/null
 
