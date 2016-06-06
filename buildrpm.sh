@@ -1,10 +1,18 @@
 #!/usr/bin/env bash
 SET_SKIP=0
+START_PATH=$1
+
+if [ -z "$1" ]; then
+    echo "Start path is required."
+    exit 1
+fi
+
+cd $START_PATH
 
 while getopts ":hs" opt; do
     case $opt in
         h)
-            echo -e "Usage: \n\t./buildrpm.sh [-s]\n\n\t-s Skip checking for upstream changes" >&2
+            echo -e "Usage: \n\t./buildrpm.sh <start_path> [-s]\n\n\t-s Skip checking for upstream changes" >&2
             exit 0
             ;;
         s)
