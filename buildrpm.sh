@@ -1,13 +1,5 @@
 #!/usr/bin/env bash
 SET_SKIP=0
-START_PATH=$1
-
-if [ -z "$1" ]; then
-    echo "Start path is required."
-    exit 1
-fi
-
-cd $START_PATH
 
 while getopts ":hs" opt; do
     case $opt in
@@ -20,13 +12,24 @@ while getopts ":hs" opt; do
             ;;
         \?)
             echo "Invalid option: -$OPTARG" >&2
+            exit 1
     esac
 done
+
+START_PATH=$1
+
+if [ -z "$1" ]; then
+    echo "Start path is required."
+    exit 1
+fi
+
+cd $START_PATH
 
 # clean up repository to start fresh
 echo "| Cleaning up repository"
 {
     rm -rf result/*
+    rm -f ovs-specs/openvswitch-kmod-fedora.spec
     cd ovs
     git reset --hard HEAD
     git clean -f -d -X
@@ -55,13 +58,18 @@ if [ $SET_SKIP = "0" ]; then
 fi
 
 # create new build version
-DATE=`date -u +%Y%m%d%H%M`
-GITHASH=`git rev-parse --short HEAD`
-VERSION=${DATE}git${GITHASH}
+# clever trick taken from http://copr-dist-git.fedorainfracloud.org/cgit/pmatilai/dpdk-snapshot/openvswitch.git/tree/ovs-snapshot.sh?h=epel7
+snapgit=`git log --pretty=oneline -n1|cut -c1-8`
+snapser=`git log --pretty=oneline | wc -l`
+
+basever=`grep AC_INIT configure.ac | cut -d' ' -f2 | cut -d, -f1`
+
+prefix=openvswitch-${basever}.${snapser}.git${snapgit}
+archive=${prefix}.tar.gz
 
 # update configure.ac with new version
-echo "| Creating build $VERSION"
-sed -i 's/AC_INIT.*/AC_INIT(openvswitch, '$VERSION', bugs@openvswitch.org)/' configure.ac &> /dev/null
+echo "| Creating build ${prefix}"
+sed -i 's/AC_INIT.*/AC_INIT(openvswitch, '${basever}.${snapser}.git${snapgit}', bugs@openvswitch.org)/' configure.ac &> /dev/null
 
 # prepare environment, build tarball, update spec files
 {
@@ -74,29 +82,56 @@ sed -i 's/AC_INIT.*/AC_INIT(openvswitch, '$VERSION', bugs@openvswitch.org)/' con
     cd -
 } &> /dev/null
 
+# move sources around
+mv ovs/*.tar.gz ovs-sources/
+
+# setup template for openvswitch-kmod
+cp ovs-specs/openvswitch-kmod-fedora.spec.tmpl ovs-specs/openvswitch-kmod-fedora.spec
+sed -i "s/@VERSION@/${basever}.${snapser}.git${snapgit}/" ovs-specs/openvswitch-kmod-fedora.spec
+
 # build SRPM from spec with tarball
-echo "|__ Building SRPM for $VERSION"
+echo "|__ Building SRPM for $prefix"
 {
     mock --root fedora-23-x86_64 \
          --dnf \
          --spec ovs/rhel/openvswitch-fedora.spec \
-         --sources=ovs/  \
+         --sources=ovs-sources/  \
          --resultdir=result \
          --buildsrpm
 
-    SRPM=`ls result/*.rpm 2>/dev/null`
+    SRPM=`ls result/openvswitch-${basever}*.rpm 2>/dev/null`
+
+    mock --root fedora-23-x86_64 \
+        --dnf \
+        --spec ovs-specs/openvswitch-kmod-fedora.spec \
+        --sources=ovs-sources/ \
+        --resultdir=result \
+        --buildsrpm
+
+    KMOD_SRPM=`ls result/openvswitch-kmod-${basever}*.rpm 2>/dev/null`
 } &> /dev/null
 
+echo $SRPM
+echo $KMOD_SRPM
+
 echo "   |__ Checking if we have an RPM to upload..."
-if [ ! -z $SRPM ]; then
-    echo "      |__ Uploading $SRPM"
-    {
-    copr build --nowait \
-                ovs-master $SRPM
-    } &> /dev/null
-else
-    echo "      |__ Nothing to upload"
-fi
+for build in $SRPM $KMOD_SRPM; do
+    if [ ! -z $build ]; then
+        echo "      |__ Uploading $build"
+        {
+            if [ "$build" == "$KMOD_SRPM" ]; then
+                CHROOT="--chroot epel-7-x86_64"
+            else
+                CHROOT=""
+            fi
+
+            copr build --nowait $CHROOT\
+                    ovs-master $build
+        } &> /dev/null
+    else
+        echo "      |__ Nothing to upload"
+    fi
+done
 
 echo "| All done!"
 exit 0
