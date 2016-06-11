@@ -16,6 +16,8 @@ while getopts ":hs" opt; do
     esac
 done
 
+# TODO: this doesn't work really because we're using $1. Maybe move to just
+#       requiring another getopts flag? Should be able to handle args and flags
 START_PATH=$1
 
 if [ -z "$1" ]; then
@@ -110,9 +112,6 @@ echo "|__ Building SRPM for $prefix"
 
     KMOD_SRPM=`ls result/openvswitch-kmod-${basever}*.rpm 2>/dev/null`
 } &> /dev/null
-
-echo $SRPM
-echo $KMOD_SRPM
 
 echo "   |__ Checking if we have an RPM to upload..."
 for build in $SRPM $KMOD_SRPM; do
