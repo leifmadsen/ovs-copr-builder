@@ -1,27 +1,35 @@
 #!/usr/bin/env bash
-SET_SKIP=0
+SET_SKIP=false
+PUBLISH_COPR=false
 
-while getopts ":hs" opt; do
+while getopts ":hscp:" opt; do
     case $opt in
         h)
             echo -e "Usage: \n\t./buildrpm.sh <start_path> [-s]\n\n\t-s Skip checking for upstream changes" >&2
             exit 0
             ;;
         s)
-            SET_SKIP=1
+            SET_SKIP=true
+            ;;
+        c)
+            PUBLISH_COPR=true
+            ;;
+        p)
+            START_PATH=$OPTARG
             ;;
         \?)
             echo "Invalid option: -$OPTARG" >&2
             exit 1
+            ;;
+        :)
+            echo "Option -$OPTARG requires an argument" >&2
+            exit 1
+            ;;
     esac
 done
 
-# TODO: this doesn't work really because we're using $1. Maybe move to just
-#       requiring another getopts flag? Should be able to handle args and flags
-START_PATH=$1
-
-if [ -z "$1" ]; then
-    echo "Start path is required."
+if [ -z "$START_PATH" ]; then
+    echo "Start path is required. See application help."
     exit 1
 fi
 
@@ -54,7 +62,7 @@ check_for_update()
 }
 
 # check if we should skip update check
-if [ $SET_SKIP = "0" ]; then
+if $SET_SKIP; then
     echo "| Checking if we need to continue..."
     check_for_update
 fi
@@ -113,24 +121,26 @@ echo "|__ Building SRPM for $prefix"
     KMOD_SRPM=`ls result/openvswitch-kmod-${basever}*.rpm 2>/dev/null`
 } &> /dev/null
 
-echo "   |__ Checking if we have an RPM to upload..."
-for build in $SRPM $KMOD_SRPM; do
-    if [ ! -z $build ]; then
-        echo "      |__ Uploading $build"
-        {
-            if [ "$build" == "$KMOD_SRPM" ]; then
-                CHROOT="--chroot epel-7-x86_64"
-            else
-                CHROOT=""
-            fi
+if $PUBLISH_COPR; then
+    echo "   |__ Checking if we have an RPM to upload..."
+    for build in $SRPM $KMOD_SRPM; do
+        if [ ! -z $build ]; then
+            echo "      |__ Uploading $build"
+            {
+                if [ "$build" == "$KMOD_SRPM" ]; then
+                    CHROOT="--chroot epel-7-x86_64"
+                else
+                    CHROOT=""
+                fi
 
-            copr build --nowait $CHROOT\
-                    ovs-master $build
-        } &> /dev/null
-    else
-        echo "      |__ Nothing to upload"
-    fi
-done
+                copr build --nowait $CHROOT\
+                        ovs-master $build
+            } &> /dev/null
+        else
+            echo "      |__ Nothing to upload"
+        fi
+    done
+fi
 
 echo "| All done!"
 exit 0
