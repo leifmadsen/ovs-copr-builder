@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-SET_SKIP=false
+CHECK_CHANGE=true
 PUBLISH_COPR=false
 
 while getopts ":hscp:" opt; do
@@ -9,7 +9,7 @@ while getopts ":hscp:" opt; do
             exit 0
             ;;
         s)
-            SET_SKIP=true
+            CHECK_CHANGE=false
             ;;
         c)
             PUBLISH_COPR=true
@@ -54,7 +54,7 @@ check_for_update()
 
     if [ $LOCAL != $REMOTE ]; then
         echo "|__ Pulling latest changes..."
-        git pull --ff-only &> /dev/null
+        git pull &> /dev/null
     else
         echo "|__ Nothing changed upstream. Ending."
         exit 1
@@ -62,7 +62,7 @@ check_for_update()
 }
 
 # check if we should skip update check
-if $SET_SKIP; then
+if $CHECK_CHANGE; then
     echo "| Checking if we need to continue..."
     check_for_update
 fi
