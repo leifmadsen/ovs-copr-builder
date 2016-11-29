@@ -2,6 +2,8 @@
 CHECK_CHANGE=true
 PUBLISH_COPR=false
 
+source buildrpm.conf
+
 while getopts ":hscp:" opt; do
     case $opt in
         h)
@@ -59,6 +61,11 @@ check_for_update()
         echo "|__ Nothing changed upstream. Ending."
         exit 1
     fi
+}
+
+mail_failure()
+{
+    mutt -s "OVS failed to upload to Copr" $EMAIL_ADDRESS < /dev/null
 }
 
 # check if we should skip update check
@@ -136,6 +143,9 @@ if $PUBLISH_COPR; then
                 copr build --nowait $CHROOT\
                         ovs-master $build
             } &> /dev/null
+            if [ $? != 0 ]; then
+                mail_failure
+            fi
         else
             echo "      |__ Nothing to upload"
         fi
