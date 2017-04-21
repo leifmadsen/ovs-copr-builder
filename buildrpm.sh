@@ -35,37 +35,41 @@ if [ -z "$START_PATH" ]; then
     exit 1
 fi
 
-cd $START_PATH
+cd "$START_PATH" || exit
 
 # clean up repository to start fresh
 echo "| Cleaning up repository"
 {
     rm -rf result/*
     rm -f ovs-specs/openvswitch-kmod-fedora.spec
-    cd ovs
+    pushd ovs
     git reset --hard HEAD
     git clean -f -d -X
+    popd
 } &> /dev/null
 
 # check if we need to update and continue
 check_for_update()
 {
+    pushd ovs
     git remote update &> /dev/null
     LOCAL=$(git rev-parse @)
     REMOTE=$(git rev-parse @{u})
 
-    if [ $LOCAL != $REMOTE ]; then
+    if [ "$LOCAL" != "$REMOTE" ]; then
         echo "|__ Pulling latest changes..."
         git pull &> /dev/null
+        popd
     else
         echo "|__ Nothing changed upstream. Ending."
+        popd
         exit 1
     fi
 }
 
 mail_failure()
 {
-    mutt -s "OVS failed to upload to Copr" $EMAIL_ADDRESS < /dev/null
+    mutt -s "OVS failed to upload to Copr" "$EMAIL_ADDRESS" < /dev/null
 }
 
 # check if we should skip update check
@@ -74,12 +78,14 @@ if $CHECK_CHANGE; then
     check_for_update
 fi
 
+pushd ovs
+
 # create new build version
 # clever trick taken from http://copr-dist-git.fedorainfracloud.org/cgit/pmatilai/dpdk-snapshot/openvswitch.git/tree/ovs-snapshot.sh?h=epel7
-snapgit=`git log --pretty=oneline -n1|cut -c1-8`
-snapser=`git log --pretty=oneline | wc -l`
+snapgit=$(git log --pretty=oneline -n1|cut -c1-8)
+snapser=$(git log --pretty=oneline | wc -l)
 
-basever=`grep AC_INIT configure.ac | cut -d' ' -f2 | cut -d, -f1`
+basever=$(grep AC_INIT configure.ac | cut -d' ' -f2 | cut -d, -f1)
 
 prefix=openvswitch-${basever}.${snapser}.git${snapgit}
 archive=${prefix}.tar.gz
@@ -93,11 +99,9 @@ sed -i 's/AC_INIT.*/AC_INIT(openvswitch, '${basever}.${snapser}.git${snapgit}', 
     ./boot.sh
     ./configure
     make dist
-    # skip checks
-    sed -i '/%bcond_with dpdk/a %bcond_without check' rhel/openvswitch-fedora.spec
-    sed -i 's/%bcond_without check//' rhel/openvswitch-fedora.spec
-    cd -
 } &> /dev/null
+
+popd
 
 # move sources around
 mv ovs/*.tar.gz ovs-sources/
@@ -109,23 +113,23 @@ sed -i "s/@VERSION@/${basever}.${snapser}.git${snapgit}/" ovs-specs/openvswitch-
 # build SRPM from spec with tarball
 echo "|__ Building SRPM for $prefix"
 {
-    mock --root fedora-23-x86_64 \
+    mock --root epel-7-x86_64 \
          --dnf \
          --spec ovs/rhel/openvswitch-fedora.spec \
          --sources=ovs-sources/  \
          --resultdir=result \
          --buildsrpm
 
-    SRPM=`ls result/openvswitch-${basever}*.rpm 2>/dev/null`
+    SRPM=$(ls result/openvswitch-${basever}*.rpm 2>/dev/null)
 
-    mock --root fedora-23-x86_64 \
+    mock --root epel-7-x86_64 \
         --dnf \
         --spec ovs-specs/openvswitch-kmod-fedora.spec \
         --sources=ovs-sources/ \
         --resultdir=result \
         --buildsrpm
 
-    KMOD_SRPM=`ls result/openvswitch-kmod-${basever}*.rpm 2>/dev/null`
+    KMOD_SRPM=$(ls result/openvswitch-kmod-${basever}*.rpm 2>/dev/null)
 } &> /dev/null
 
 if $PUBLISH_COPR; then
