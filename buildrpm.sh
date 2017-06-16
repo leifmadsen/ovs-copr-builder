@@ -4,10 +4,18 @@ PUBLISH_COPR=false
 
 source buildrpm.conf
 
+read -r -d '' HELPMSG << EOM
+Usage:
+    ./buildrpm.sh -p <start_path> [-s]
+        -s Skip checking for upstream changes
+        -c Publish to COPR
+        -p Start path
+EOM
+
 while getopts ":hscp:" opt; do
     case $opt in
         h)
-            echo -e "Usage: \n\t./buildrpm.sh <start_path> [-s]\n\n\t-s Skip checking for upstream changes" >&2
+            echo -e "$HELPMSG" >&2
             exit 0
             ;;
         s)
@@ -88,7 +96,6 @@ snapser=$(git log --pretty=oneline | wc -l)
 basever=$(grep AC_INIT configure.ac | cut -d' ' -f2 | cut -d, -f1)
 
 prefix=openvswitch-${basever}.${snapser}.git${snapgit}
-archive=${prefix}.tar.gz
 
 # update configure.ac with new version
 echo "| Creating build ${prefix}"
