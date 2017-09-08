@@ -49,7 +49,8 @@ cd "$START_PATH" || exit
 echo "| Cleaning up repository"
 {
     rm -rf result/*
-    rm -f ovs-specs/openvswitch-kmod-fedora.spec
+    rm -f ovs-specs/openvswitch-kmod.spec
+    rm -f ovs-specs/openvswitch.spec
     pushd ovs
     git reset --hard HEAD
     git clean -f -d -X
@@ -114,15 +115,17 @@ popd
 mv ovs/*.tar.gz ovs-sources/
 
 # setup template for openvswitch-kmod
-cp ovs-specs/openvswitch-kmod-fedora.spec.tmpl ovs-specs/openvswitch-kmod-fedora.spec
-sed -i "s/@VERSION@/${basever}.${snapser}.git${snapgit}/" ovs-specs/openvswitch-kmod-fedora.spec
+cp ovs-specs/openvswitch-kmod-fedora.spec.tmpl ovs-specs/openvswitch-kmod.spec
+sed -i "s/@VERSION@/${basever}.${snapser}.git${snapgit}/" ovs-specs/openvswitch-kmod.spec
+
+cp ovs/rhel/openvswitch-fedora.spec ovs-specs/openvswitch.spec
 
 # build SRPM from spec with tarball
 echo "|__ Building SRPM for $prefix"
 {
     mock --root epel-7-x86_64 \
          --dnf \
-         --spec ovs/rhel/openvswitch-fedora.spec \
+         --spec ovs-specs/openvswitch.spec \
          --sources=ovs-sources/  \
          --resultdir=result \
          --buildsrpm
@@ -131,7 +134,7 @@ echo "|__ Building SRPM for $prefix"
 
     mock --root epel-7-x86_64 \
         --dnf \
-        --spec ovs-specs/openvswitch-kmod-fedora.spec \
+        --spec ovs-specs/openvswitch-kmod.spec \
         --sources=ovs-sources/ \
         --resultdir=result \
         --buildsrpm
