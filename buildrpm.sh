@@ -115,8 +115,8 @@ popd
 mv ovs/*.tar.gz ovs-sources/
 
 # setup template for openvswitch-kmod
-cp ovs-specs/openvswitch-kmod-fedora.spec.tmpl ovs-specs/openvswitch-kmod.spec
-sed -i "s/@VERSION@/${basever}.${snapser}.git${snapgit}/" ovs-specs/openvswitch-kmod.spec
+#cp ovs-specs/openvswitch-kmod-fedora.spec.tmpl ovs-specs/openvswitch-kmod.spec
+#sed -i "s/@VERSION@/${basever}.${snapser}.git${snapgit}/" ovs-specs/openvswitch-kmod.spec
 
 cp ovs/rhel/openvswitch-fedora.spec ovs-specs/openvswitch.spec
 
@@ -132,14 +132,15 @@ echo "|__ Building SRPM for $prefix"
 
     SRPM=$(ls result/openvswitch-${basever}*.rpm 2>/dev/null)
 
-    mock --root epel-7-x86_64 \
-        --dnf \
-        --spec ovs-specs/openvswitch-kmod.spec \
-        --sources=ovs-sources/ \
-        --resultdir=result \
-        --buildsrpm
-
-    KMOD_SRPM=$(ls result/openvswitch-kmod-${basever}*.rpm 2>/dev/null)
+    # **NOTE** when building this, an openvswitch-kmod-kernel-version file must be present in ovs-sources/ that contains the proper kernel version
+#    mock --root epel-7-x86_64 \
+#        --dnf \
+#        --spec ovs-specs/openvswitch-kmod.spec \
+#        --sources=ovs-sources/ \
+#        --resultdir=result \
+#        --buildsrpm
+#
+#    KMOD_SRPM=$(ls result/openvswitch-kmod-${basever}*.rpm 2>/dev/null)
 } &> /dev/null
 
 if $PUBLISH_COPR; then
